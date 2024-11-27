@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #SBATCH -p compute    # which partition to run on ('compute' is default)
-#SBATCH -J appraiseALBERT    # arbitrary name for the job (you choose)
-#SBATCH --output=appraise-BERT_%j.out
-#SBATCH --error=appraise-BERT_%j.err
+#SBATCH -J appraiseRoBERTa    # arbitrary name for the job (you choose)
+#SBATCH --output=logs/appraiseRoBERTa_%j.out
+#SBATCH --error=logs/appraiseRoBERTa_%j.err
 #SBATCH --cpus-per-task=4    # tell Slurm how many CPU cores you need, if different from default; your job won't be able to use more than this
 #SBATCH --mem=50000    # how much RAM you need (50GB in this case), if different from default; your job won't be able to use more than this
 #SBATCH -t 12:30:00    # maximum execution time: in this case twelve hours and thirty minutes (optional)

@@ -31,7 +31,7 @@ class TextValueDataset(Dataset):
         row = self.dataframe.iloc[index]
         text = row['generated_text']
         label = (row[self.column] - 1)/4 # Convert value to 0-4 classes
-        
+
         encoding = self.tokenizer.encode_plus(
             text,
             add_special_tokens=True,
@@ -41,7 +41,7 @@ class TextValueDataset(Dataset):
             return_tensors='pt',
             return_attention_mask=True
         )
-        
+
         return {
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),
@@ -64,7 +64,7 @@ def create_dataloader(df, tokenizer, max_length, batch_size, column):
 # Model setup with gradient checkpointing enabled
 def create_model(model_name, num_labels):
     model = AutoModelForSequenceClassification.from_pretrained(
-        model_name, 
+        model_name,
         num_labels=num_labels
     )
     model.gradient_checkpointing_enable()  # Enable gradient checkpointing
@@ -90,26 +90,26 @@ def evaluate(model, dataloader, device):
             )
             logits = outputs.logits
             preds = torch.argmax(logits, dim=1)
-            
+
             loss = outputs.loss
             eval_loss += loss.item()
             eval_loop.set_postfix(loss=loss.item())
-            
+
             predictions.extend(preds.cpu().numpy())
             true_labels.extend(labels.cpu().numpy())
             rmse = np.sqrt(((np.array(predictions) - np.array(true_labels)) ** 2).mean())
-    
+
     # accuracy = accuracy_score(true_labels, predictions)
     # precision, recall, f1, _ = precision_recall_fscore_support(true_labels, predictions, average='weighted')
     mae = mean_absolute_error(true_labels, predictions)
     mse = mean_squared_error(true_labels, predictions)
     return eval_loss, np.sqrt(mse), mse, mae
-    
+
 
 # Training function with mixed precision support
-def train(model, train_loader, val_loader, test_loader, epochs, device, lr, save_path, 
-          weight_decay=0.1, 
-          # max_grad_norm=1.0, 
+def train(model, train_loader, val_loader, test_loader, epochs, device, lr, save_path,
+          weight_decay=0.1,
+          # max_grad_norm=1.0,
           patience=3):
     optimizer = AdamW(model.parameters(), lr=lr)
     model = model.to(device)
@@ -130,15 +130,15 @@ def train(model, train_loader, val_loader, test_loader, epochs, device, lr, save
 
     for epoch in range(epochs):
         print(f'Epoch {epoch + 1}/{epochs}')
-        
+
         # Training
         model.train()
         train_loss = 0
         train_loop = tqdm(train_loader, desc="Training")
-        
+
         for batch in train_loop:
             optimizer.zero_grad()
-            
+
             input_ids = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
             labels = batch['labels'].to(device)
@@ -151,7 +151,7 @@ def train(model, train_loader, val_loader, test_loader, epochs, device, lr, save
                     labels=labels
                 )
                 loss = outputs.loss
-            
+
             # Backpropagation with scaler
             scaler.scale(loss).backward()
 
@@ -161,7 +161,7 @@ def train(model, train_loader, val_loader, test_loader, epochs, device, lr, save
             scaler.step(optimizer)
             scaler.update()
             scheduler.step()
-            
+
             train_loss += loss.item()
             train_loop.set_postfix(loss=loss.item())
 
@@ -178,7 +178,8 @@ def train(model, train_loader, val_loader, test_loader, epochs, device, lr, save
         if val_loss <= min_val_loss:
             # model_save_path = os.path.join(save_path, )
             model_save_path = save_path
-            torch.save(model.state_dict(), model_save_path)
+            # torch.save(model.state_dict(), model_save_path)
+            model.save_pretrained(model_save_path)
             print(f'Model saved to {model_save_path}')
             min_val_loss = val_loss
             epoch_counter = 0
@@ -187,7 +188,7 @@ def train(model, train_loader, val_loader, test_loader, epochs, device, lr, save
             print(f'Model not saved due to higher validation loss {val_loss:.4f} compared to {min_val_loss:.4f}')
 
         if epoch_counter >= patience:
-            print(f'Model did not improve after {epoch - patience} epochs for {patience} epochs. Training halted')  
+            print(f'Model did not improve after {epoch - patience} epochs for {patience} epochs. Training halted')
             break
     # Evaluation
     # _, test_accuracy, test_rmse, test_precision, test_recall, test_f1 = evaluate(model, test_loader, device)
@@ -197,7 +198,7 @@ def train(model, train_loader, val_loader, test_loader, epochs, device, lr, save
     # print(f'Test Accuracy: {test_accuracy:.4f}, Test RMSE: {test_rmse: .4f}, Precision: {test_precision:.4f}, Recall: {test_recall:.4f}, F1: {test_f1:.4f}')
 
     print(f'Test RMSE: {test_rmse:.4f}, Test MSE: {test_mse:.4f}, Test MAE: {test_mae:.4f}')
-        
+
 
 # Main function
 def main():
@@ -209,31 +210,31 @@ def main():
     lr = 3e-5
     save_path = './models'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+
     # Make sure the save directory exists
     os.makedirs(save_path, exist_ok=True)
 
     # Load datasets
-    model_name =  'textattack/albert-base-v2-imdb'
+    model_name =  'roberta-base'
     tokenizer = AutoTokenizer.from_pretrained(model_name)  # Changed to roberta-large
     train_df = load_dataset('../data/crowd-enVent-train.tsv')
     test_df = load_dataset('../data/crowd-enVent-test.tsv')
     val_df = load_dataset('../data/crowd-enVent-val.tsv')
 
     # Create DataLoaders
-    for column in list(train_df.columns[list(train_df.columns).index('suddenness') : list(train_df.columns).index('effort')]):
+    for column in list(train_df.columns[list(train_df.columns).index('effort') : list(train_df.columns).index('effort') + 1]):
         print('='*80)
-        print(column)
-        
-        save_path = './models/' + model_name + '/' + column + '_' + model_name + '.pt'  # Directory to save models
+        print(model_name, column)
+
+        save_path = './models/' + model_name.split('/')[0] + '/' + column + '_' + model_name.split('/')[0]  # Directory to save models
         os.makedirs(save_path, exist_ok=True)
         train_loader = create_dataloader(train_df, tokenizer, max_length, batch_size, column)
         val_loader = create_dataloader(val_df, tokenizer, max_length, batch_size, column)
         test_loader = create_dataloader(test_df, tokenizer, max_length, batch_size, column)
-    
+
         # Initialize model
         model = create_model(model_name, num_labels)
-    
+
         # Train and evaluate the model
         train(model, train_loader, val_loader, test_loader, epochs, device, lr, save_path)
 
