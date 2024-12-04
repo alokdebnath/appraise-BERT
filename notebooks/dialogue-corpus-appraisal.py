@@ -53,11 +53,11 @@ def appraise_dataset(df, modeldir, tokenizer, device, dial_col='utterances'):
     
     for model_name in os.listdir(modeldir):
         # model_name='./models/google-t5/suddenness_google-t5/'
-        if 'effort_' in model_name:
+        if '.ipy' in model_name:
             continue
         column = str.join('_', model_name.split('_')[:-1])
         print(column)
-        model = AutoModelForSequenceClassification.from_pretrained(os.path.join(model_dir, model_name))
+        model = AutoModelForSequenceClassification.from_pretrained(os.path.join(modeldir, model_name))
         model = model.to(device)
         app_store = []
         for batch in tqdm(dataloader):
@@ -106,7 +106,9 @@ def main(datapath, sp1col, sp2col, savepath, modeldir):
         df = pd.read_csv(datapath, low_memory=False)
     else:
         df = pd.read_json(datapath, low_memory=False)
-    df = df.dropna()
+
+    if 'empdial' in datapath:
+        df = df.dropna()
     
     tokenizer = AutoTokenizer.from_pretrained('google-t5/t5-small')
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -127,10 +129,61 @@ def main(datapath, sp1col, sp2col, savepath, modeldir):
     df = remake_df(df, appdf, sp1col, sp2col)
     df.to_csv(savepath)
 
-if __name__ == '__main__':
-    datapath = './dialogues/ALOE/ALOE train.json'
-    sp1 = 'sp1'
-    sp2 = 'sp2'
-    modeldir = './models/google-t5/'
-    data_savepath = './google-t5_empdial_train.csv'
-    main(datapath, sp1, sp2, data_savepath, modeldir)
+import argparse
+
+def get_args():
+    parser = argparse.ArgumentParser(description="Argument parser for running the model.")
+
+    # Adding arguments
+    parser.add_argument(
+        "--datapath", 
+        type=str, 
+        required=True, 
+        help="Path to the input dataset."
+    )
+    parser.add_argument(
+        "--sp1", 
+        type=str, 
+        required=True, 
+        help="Columns name for speaker 1"
+    )
+    parser.add_argument(
+        "--sp2", 
+        type=str, 
+        required=True, 
+        help="Colunn name for speaker 2."
+    )
+    parser.add_argument(
+        "--data_savepath", 
+        type=str, 
+        required=True, 
+        help="Path to save processed data."
+    )
+    parser.add_argument(
+        "--modeldir", 
+        type=str, 
+        required=True, 
+        help="Directory to save or load the model."
+    )
+
+    args = parser.parse_args()
+    return args
+
+if __name__ == "__main__":
+    args = get_args()
+
+    # Accessing the arguments
+    print("Datapath:", args.datapath)
+    print("SP1:", args.sp1)
+    print("SP2:", args.sp2)
+    print("Data save path:", args.data_savepath)
+    print("Model directory:", args.modeldir)
+    
+    # datapath = './dialogues/epitome/train.csv'
+    # sp1 = 'seeker_post'
+    # sp2 = 'response_post'
+    # modeldir = './models/google-t5/'
+    # data_savepath = './appraised_dialogues/google-t5_epitome_train.csv'
+
+    
+    main(args.datapath, args.sp1, args.sp2, args.data_savepath, args.modeldir)
